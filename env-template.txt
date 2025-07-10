@@ -1,0 +1,24 @@
+# Database Configuration
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=interactive
+DB_USER=postgre
+DB_PASS=Crab1202!
+
+# JWT Configuration
+JWT_SECRET=your-super-secret-jwt-key-here
+
+# SMTP Configuration for Email Sending
+SMTP_HOST=mail.tazamail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=marcocampos1202@gmail.com
+SMTP_PASS=Business@9100
+FROM_EMAIL='admin@ebinti.com'
+
+# Verification Code Settings
+VERIFICATION_CODE_EXPIRY=300000
+
+# Server Configuration
+PORT=3001
+NODE_ENV=development 
