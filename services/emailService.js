@@ -326,7 +326,7 @@ class EmailService {
         <div class="container">
             <div class="header">
                 <h1>Email Verification</h1>
-                <p>Interactive Companies</p>
+                <p>Interaction Casino</p>
             </div>
             <div class="content">
                 <h2>Welcome!</h2>
