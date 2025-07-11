@@ -1,7 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const { body, validationResult } = require('express-validator');
-const { User, EmailVerification, MobileVerification } = require('../models');
+const { User, EmailVerification } = require('../models');
 const { Op } = require('sequelize');
 const emailService = require('../services/emailService');
 const router = express.Router();
@@ -163,141 +163,7 @@ router.post('/verify-email', [
   }
 });
 
-// Send mobile verification code (pre-registration - phone only)
-router.post('/send-mobile', [
-  body('phone').isMobilePhone().withMessage('Valid mobile number is required')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
-    }
 
-    const { phone } = req.body;
-
-    // Check if user already exists with this mobile number
-    const existingUser = await User.findOne({ where: { mobileNumber: phone } });
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: 'Mobile number is already registered'
-      });
-    }
-
-    // Invalidate any existing verification codes for this phone
-    await MobileVerification.update(
-      { isUsed: true },
-      { where: { mobileNumber: phone, isUsed: false } }
-    );
-
-    // Generate expiration date
-    const expiresAt = generateExpirationDate();
-
-    // Create verification record without code (will be set by external SMS service)
-    const verificationRecord = await MobileVerification.create({
-      userId: null, // null for pre-registration verification
-      mobileNumber: phone,
-      verificationCode: '', // Will be set by external service
-      expiresAt,
-      attempts: 0,
-      isUsed: false
-    });
-
-    // TODO: Integrate with SMS service (Twilio, etc.)
-    // For now, we'll return success but note that SMS integration is needed
-    console.log(`📱 Mobile verification requested for ${phone}. SMS integration needed.`);
-
-    res.json({
-      success: true,
-      message: 'Verification code sent to your mobile number',
-      data: {
-        expiresAt
-      }
-    });
-
-  } catch (error) {
-    console.error('Send mobile verification error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to send verification code'
-    });
-  }
-});
-
-// Verify mobile code (pre-registration - phone only)
-router.post('/verify-mobile', [
-  body('phone').isMobilePhone().withMessage('Valid mobile number is required'),
-  body('code').isLength({ min: 6, max: 6 }).withMessage('Verification code must be 6 digits')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
-    }
-
-    const { phone, code } = req.body;
-
-    // Find verification record for pre-registration (userId is null)
-    const verification = await MobileVerification.findOne({
-      where: {
-        mobileNumber: phone,
-        verificationCode: code,
-        userId: null, // pre-registration verification
-        isUsed: false,
-        expiresAt: { [Op.gt]: new Date() }
-      }
-    });
-
-    if (!verification) {
-      // Increment attempts for any valid verification record
-      await MobileVerification.increment('attempts', {
-        where: {
-          mobileNumber: phone,
-          userId: null,
-          isUsed: false,
-          expiresAt: { [Op.gt]: new Date() }
-        }
-      });
-
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid or expired verification code'
-      });
-    }
-
-    // Check attempts limit
-    if (verification.attempts >= 5) {
-      await verification.update({ isUsed: true });
-      return res.status(400).json({
-        success: false,
-        message: 'Too many verification attempts. Please request a new code.'
-      });
-    }
-
-    // Mark verification as used
-    await verification.update({ isUsed: true });
-
-    res.json({
-      success: true,
-      message: 'Mobile number verified successfully'
-    });
-
-  } catch (error) {
-    console.error('Verify mobile error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to verify mobile number'
-    });
-  }
-});
 
 // Original endpoints with userId (for existing user verification)
 // Send email verification code (existing user)
@@ -387,7 +253,7 @@ router.get('/status/:userId', async (req, res) => {
     const { userId } = req.params;
 
     const user = await User.findByPk(userId, {
-      attributes: ['id', 'email', 'mobileNumber', 'emailVerified', 'mobileVerified']
+      attributes: ['id', 'email', 'mobileNumber', 'emailVerified']
     });
 
     if (!user) {
@@ -403,8 +269,7 @@ router.get('/status/:userId', async (req, res) => {
         userId: user.id,
         email: user.email,
         mobileNumber: user.mobileNumber,
-        emailVerified: user.emailVerified,
-        mobileVerified: user.mobileVerified
+        emailVerified: user.emailVerified
       }
     });
 

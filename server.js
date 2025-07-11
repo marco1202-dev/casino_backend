@@ -43,7 +43,7 @@ app.use(limiter);
 // Stricter rate limiting for auth endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // limit each IP to 5 requests per windowMs
+  max: process.env.NODE_ENV === 'development' ? 50 : 5, // Higher limit for development
   message: 'Too many authentication attempts, please try again later.'
 });
 
@@ -72,7 +72,11 @@ app.get('/health', (req, res) => {
 });
 
 // Authentication routes
-app.use('/api/auth', authLimiter, require('./routes/auth'));
+if (process.env.NODE_ENV === 'development') {
+  app.use('/api/auth', require('./routes/auth')); // No rate limiting in development
+} else {
+  app.use('/api/auth', authLimiter, require('./routes/auth')); // Rate limiting in production
+}
 
 // User management routes
 app.use('/api/users', require('./routes/users'));

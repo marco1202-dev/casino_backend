@@ -240,7 +240,7 @@ router.get('/registration-status/:userId', async (req, res) => {
     const { userId } = req.params;
 
     const user = await User.findByPk(userId, {
-      attributes: ['id', 'registrationStep', 'registrationCompleted', 'emailVerified', 'mobileVerified']
+      attributes: ['id', 'registrationStep', 'registrationCompleted', 'emailVerified']
     });
 
     if (!user) {
@@ -257,7 +257,7 @@ router.get('/registration-status/:userId', async (req, res) => {
         registrationStep: user.registrationStep,
         registrationCompleted: user.registrationCompleted,
         emailVerified: user.emailVerified,
-        mobileVerified: user.mobileVerified
+
       }
     });
 

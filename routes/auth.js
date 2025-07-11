@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const { User, LoginAttempt } = require('../models');
+const { Op } = require('sequelize');
 const router = express.Router();
 
 // Helper function to log login attempts
@@ -268,7 +269,7 @@ router.post('/login', [
     // Find user by email or username
     const user = await User.findOne({
       where: {
-        $or: [
+        [Op.or]: [
           { email: emailOrUsername },
           { username: emailOrUsername }
         ]
@@ -415,8 +416,7 @@ router.post('/signup', [
   body('city').trim().isLength({ min: 1 }).withMessage('City is required'),
   body('zipcode').trim().isLength({ min: 1 }).withMessage('Postal code is required'),
   body('phone').trim().isLength({ min: 1 }).withMessage('Mobile number is required'),
-  body('mobile_verified').isBoolean().withMessage('Mobile verification is required'),
-  body('bankroll_currency').isIn(['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'CNY', 'BTC', 'ETH']).withMessage('Valid currency is required')
+  body('bankroll_currency').isIn(['USD', 'EUR', 'GBP', 'BTC', 'ETH', 'USDT', 'BNB', 'ADA', 'SOL', 'DOT']).withMessage('Valid currency is required')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -434,13 +434,13 @@ router.post('/signup', [
       // Step 2 fields
       user_id, password, security_question, security_answer,
       // Step 3 fields
-      street, house_number, city, zipcode, phone, mobile_verified, bankroll_currency
+      street, house_number, city, zipcode, phone, bankroll_currency
     } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({
       where: {
-        $or: [
+        [Op.or]: [
           { email },
           { username: user_id },
           { mobileNumber: phone }
@@ -482,12 +482,7 @@ router.post('/signup', [
       });
     }
 
-    if (!mobile_verified) {
-      return res.status(400).json({
-        success: false,
-        message: 'Mobile number must be verified before completing registration'
-      });
-    }
+
 
     // Hash password and security answer
     const passwordHash = await bcrypt.hash(password, 12);
@@ -518,7 +513,6 @@ router.post('/signup', [
       city,
       postalCode: zipcode,
       mobileNumber: phone,
-      mobileVerified: mobile_verified,
       bankrollCurrency: bankroll_currency,
 
       // Registration status

@@ -91,10 +91,7 @@ module.exports = {
         allowNull: false,
         unique: true,
       },
-      mobileVerified: {
-        type: Sequelize.BOOLEAN,
-        defaultValue: false,
-      },
+
       bankrollCurrency: {
         type: Sequelize.STRING(10),
         allowNull: false,

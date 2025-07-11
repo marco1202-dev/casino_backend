@@ -20,7 +20,6 @@ const sequelize = new Sequelize(dbConfig.database, dbConfig.username, dbConfig.p
 // Import models
 const User = require('./User')(sequelize);
 const EmailVerification = require('./EmailVerification')(sequelize);
-const MobileVerification = require('./MobileVerification')(sequelize);
 const PasswordReset = require('./PasswordReset')(sequelize);
 const LoginAttempt = require('./LoginAttempt')(sequelize);
 
@@ -35,15 +34,7 @@ EmailVerification.belongsTo(User, {
   as: 'user'
 });
 
-User.hasMany(MobileVerification, {
-  foreignKey: 'userId',
-  as: 'mobileVerifications',
-  onDelete: 'CASCADE'
-});
-MobileVerification.belongsTo(User, {
-  foreignKey: 'userId',
-  as: 'user'
-});
+
 
 User.hasMany(PasswordReset, {
   foreignKey: 'userId',
@@ -70,7 +61,6 @@ module.exports = {
   sequelize,
   User,
   EmailVerification,
-  MobileVerification,
   PasswordReset,
   LoginAttempt,
 }; 

@@ -131,11 +131,6 @@ module.exports = (sequelize) => {
       unique: true
     },
 
-    mobileVerified: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false
-    },
-
     bankrollCurrency: {
       type: DataTypes.STRING(10),
       allowNull: false,

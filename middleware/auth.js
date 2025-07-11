@@ -98,21 +98,12 @@ const requireEmailVerification = (req, res, next) => {
   next();
 };
 
-// Middleware to check if mobile is verified
-const requireMobileVerification = (req, res, next) => {
-  if (!req.userRecord || !req.userRecord.mobileVerified) {
-    return res.status(403).json({
-      success: false,
-      message: 'Mobile verification required to access this resource'
-    });
-  }
-  next();
-};
+
 
 module.exports = {
   authenticateToken,
   optionalAuth,
   requireCompleteRegistration,
   requireEmailVerification,
-  requireMobileVerification
+
 }; 
