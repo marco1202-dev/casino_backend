@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { body, validationResult } = require('express-validator');
 const { User, PasswordReset } = require('../models');
+const { Op } = require('sequelize');
 const emailService = require('../services/emailService');
 const router = express.Router();
 
@@ -60,7 +61,18 @@ router.post('/request-password-reset', [
     });
 
     // Send email via SMTP service
-    const emailResult = await emailService.sendPasswordResetEmail(user.email, resetRecord.id, expiresAt);
+    let emailResult;
+    try {
+      emailResult = await emailService.sendPasswordResetEmail(user.email, resetRecord.id, expiresAt);
+    } catch (emailError) {
+      console.error('Email service error:', emailError);
+      // Delete the reset record if email failed
+      await resetRecord.destroy();
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send password reset email. Please try again.'
+      });
+    }
 
     if (!emailResult.success) {
       // Delete the reset record if email failed
@@ -94,8 +106,12 @@ router.post('/verify-reset-code', [
   body('verificationCode').isLength({ min: 6, max: 6 }).withMessage('Verification code must be 6 digits')
 ], async (req, res) => {
   try {
+    console.log('🔍 Verify reset code endpoint called');
+    console.log('Request body:', req.body);
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('❌ Validation errors:', errors.array());
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
@@ -103,29 +119,86 @@ router.post('/verify-reset-code', [
       });
     }
 
+    console.log('✅ Validation passed');
+
     const { email, verificationCode } = req.body;
 
-    // Find password reset record
-    const resetRecord = await PasswordReset.findOne({
-      where: {
-        email,
-        resetCode: verificationCode,
-        resetType: 'password',
-        isUsed: false,
-        expiresAt: { $gt: new Date() }
-      }
-    });
+    console.log('🔍 Verifying reset code:', { email, verificationCode, currentTime: new Date() });
 
-    if (!resetRecord) {
-      // Increment attempts for any valid reset record
-      await PasswordReset.increment('attempts', {
+    // Find password reset record
+    let resetRecord;
+    try {
+      resetRecord = await PasswordReset.findOne({
         where: {
           email,
+          resetCode: verificationCode,
           resetType: 'password',
           isUsed: false,
-          expiresAt: { $gt: new Date() }
+          expiresAt: { [Op.gt]: new Date() }
         }
       });
+    } catch (queryError) {
+      console.error('❌ Database query error:', queryError);
+      throw new Error('Database query failed: ' + queryError.message);
+    }
+
+    console.log('🔍 Reset record found:', resetRecord ? 'Yes' : 'No');
+    if (resetRecord) {
+      console.log('🔍 Reset record details:', {
+        id: resetRecord.id,
+        email: resetRecord.email,
+        resetCode: resetRecord.resetCode,
+        resetType: resetRecord.resetType,
+        isUsed: resetRecord.isUsed,
+        expiresAt: resetRecord.expiresAt,
+        attempts: resetRecord.attempts
+      });
+    } else {
+      // Debug: Check if there are any password reset records for this email
+      try {
+        const allRecords = await PasswordReset.findAll({
+          where: { email, resetType: 'password' },
+          order: [['createdAt', 'DESC']]
+        });
+        console.log('🔍 All password reset records for email:', allRecords.map(r => ({
+          id: r.id,
+          resetCode: r.resetCode,
+          isUsed: r.isUsed,
+          expiresAt: r.expiresAt,
+          attempts: r.attempts,
+          createdAt: r.createdAt
+        })));
+      } catch (debugError) {
+        console.error('❌ Error fetching debug records:', debugError);
+      }
+    }
+
+    if (!resetRecord) {
+      // Increment attempts for any valid reset record (only if records exist)
+      try {
+        const validRecords = await PasswordReset.findAll({
+          where: {
+            email,
+            resetType: 'password',
+            isUsed: false,
+            expiresAt: { [Op.gt]: new Date() }
+          }
+        });
+
+        if (validRecords.length > 0) {
+          await PasswordReset.increment('attempts', {
+            where: {
+              email,
+              resetType: 'password',
+              isUsed: false,
+              expiresAt: { [Op.gt]: new Date() }
+            }
+          });
+        }
+      } catch (incrementError) {
+        console.error('Error incrementing attempts:', incrementError);
+        // Don't fail the request if increment fails
+      }
 
       return res.status(400).json({
         success: false,
@@ -135,13 +208,19 @@ router.post('/verify-reset-code', [
 
     // Check attempts limit
     if (resetRecord.attempts >= 5) {
-      await resetRecord.update({ isUsed: true });
+      try {
+        await resetRecord.update({ isUsed: true });
+      } catch (updateError) {
+        console.error('❌ Error updating reset record:', updateError);
+        throw new Error('Failed to update reset record: ' + updateError.message);
+      }
       return res.status(400).json({
         success: false,
         message: 'Too many verification attempts. Please request a new reset code.'
       });
     }
 
+    console.log('✅ Verification successful, returning reset token');
     res.json({
       success: true,
       message: 'Verification code confirmed. You can now reset your password.',
@@ -182,7 +261,7 @@ router.post('/reset-password', [
         resetToken,
         resetType: 'password',
         isUsed: false,
-        expiresAt: { $gt: new Date() }
+        expiresAt: { [Op.gt]: new Date() }
       }
     });
 
@@ -324,20 +403,36 @@ router.post('/verify-username-recovery', [
         resetCode: verificationCode,
         resetType: 'username',
         isUsed: false,
-        expiresAt: { $gt: new Date() }
+        expiresAt: { [Op.gt]: new Date() }
       }
     });
 
     if (!resetRecord) {
-      // Increment attempts for any valid reset record
-      await PasswordReset.increment('attempts', {
-        where: {
-          email,
-          resetType: 'username',
-          isUsed: false,
-          expiresAt: { $gt: new Date() }
+      // Increment attempts for any valid reset record (only if records exist)
+      try {
+        const validRecords = await PasswordReset.findAll({
+          where: {
+            email,
+            resetType: 'username',
+            isUsed: false,
+            expiresAt: { [Op.gt]: new Date() }
+          }
+        });
+
+        if (validRecords.length > 0) {
+          await PasswordReset.increment('attempts', {
+            where: {
+              email,
+              resetType: 'username',
+              isUsed: false,
+              expiresAt: { [Op.gt]: new Date() }
+            }
+          });
         }
-      });
+      } catch (incrementError) {
+        console.error('Error incrementing attempts:', incrementError);
+        // Don't fail the request if increment fails
+      }
 
       return res.status(400).json({
         success: false,
@@ -403,7 +498,7 @@ router.post('/verify-security-question', [
     // Find user by email or username
     const user = await User.findOne({
       where: {
-        $or: [
+        [Op.or]: [
           { email: emailOrUsername },
           { username: emailOrUsername }
         ]

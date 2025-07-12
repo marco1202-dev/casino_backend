@@ -1,5 +1,5 @@
 const nodemailer = require('nodemailer');
-const { EmailVerification } = require('../models');
+const { EmailVerification, PasswordReset } = require('../models');
 
 class EmailService {
   constructor() {
@@ -258,7 +258,6 @@ class EmailService {
 
     // Update the password reset record with the code
     try {
-      const { PasswordReset } = require('../models');
       const resetRecord = await PasswordReset.findByPk(verificationRecordId);
       if (resetRecord) {
         await resetRecord.update({ resetCode: verificationCode });
@@ -266,6 +265,7 @@ class EmailService {
       }
     } catch (error) {
       console.error('❌ Failed to save password reset code:', error.message);
+      throw error; // Re-throw to catch issues in the calling function
     }
 
     if (this.transporter && process.env.SMTP_HOST) {
@@ -372,7 +372,7 @@ class EmailService {
         <div class="container">
             <div class="header">
                 <h1>🔒 Password Reset</h1>
-                <p>Interactive Companies</p>
+                <p>Interactive Casino</p>
             </div>
             <div class="content">
                 <h2>Reset Your Password</h2>

@@ -24,7 +24,7 @@ module.exports = {
       },
       resetCode: {
         type: Sequelize.STRING(6),
-        allowNull: false,
+        allowNull: true,
       },
       expiresAt: {
         type: Sequelize.DATE,
@@ -45,6 +45,14 @@ module.exports = {
       usedAt: {
         type: Sequelize.DATE,
         allowNull: true,
+      },
+      attempts: {
+        type: Sequelize.INTEGER,
+        defaultValue: 0,
+      },
+      email: {
+        type: Sequelize.STRING(255),
+        allowNull: false,
       },
       createdAt: {
         type: Sequelize.DATE,
